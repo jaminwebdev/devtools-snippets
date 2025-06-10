@@ -44,7 +44,7 @@
       color: '#fff',
       borderRadius: '10px',
       boxShadow: '0 2px 16px rgba(0,0,0,0.25)',
-      padding: '18px 22px 14px 18px',
+      padding: '0 0 14px 0',
       fontFamily: 'monospace',
       fontSize: '14px',
       minWidth: '260px',
@@ -53,7 +53,21 @@
       maxHeight: '90vh',
       overflowY: 'auto',
     });
+    // Drag handle
+    const dragHandle = document.createElement('div');
+    dragHandle.style.cursor = 'move';
+    dragHandle.style.background = 'rgba(0,224,255,0.18)';
+    dragHandle.style.padding = '10px 18px 8px 18px';
+    dragHandle.style.borderTopLeftRadius = '8px';
+    dragHandle.style.borderTopRightRadius = '8px';
+    dragHandle.style.userSelect = 'none';
+    dragHandle.style.fontWeight = 'bold';
+    dragHandle.textContent = '⇕ Drag to move';
+    form.appendChild(dragHandle);
     function row(label, name, value, type = 'text', extra = '') {
+      if (name === 'text' && isLeafNode(targetEl)) {
+        return `<label style='display:block;margin-bottom:7px;'><b>${label}:</b><br/><textarea name='${name}' rows='3' style='width:98%;margin-top:2px;padding:2px 4px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;resize:vertical;' ${extra}>${value.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea></label>`;
+      }
       return `<label style='display:block;margin-bottom:7px;'><b>${label}:</b><br/><input name='${name}' type='${type}' value="${value.replace(/"/g, '&quot;')}" style='width:98%;margin-top:2px;padding:2px 4px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;' ${extra}/></label>`;
     }
     let html = '';
@@ -78,7 +92,10 @@
       <button type='submit' style='margin-right:8px;padding:3px 12px;border-radius:4px;border:none;background:#00e0ff;color:#222;font-weight:bold;cursor:pointer;'>Apply</button>
       <button type='button' id='__editTooltipCancel' style='padding:3px 12px;border-radius:4px;border:none;background:#444;color:#fff;cursor:pointer;'>Cancel</button>
     </div>`;
-    form.innerHTML = html;
+    const contentDiv = document.createElement('div');
+    contentDiv.innerHTML = html;
+    contentDiv.style.padding = '8px 18px 0 18px';
+    form.appendChild(contentDiv);
     document.body.appendChild(form);
     setTimeout(() => form.querySelector('input,button').focus(), 0);
 
@@ -102,6 +119,34 @@
       form.style.left = left + 'px';
       form.style.top = top + 'px';
     }, 0);
+
+    // Drag logic
+    let dragOffsetX = 0, dragOffsetY = 0, dragging = false;
+    dragHandle.addEventListener('mousedown', function(e) {
+      dragging = true;
+      const rect = form.getBoundingClientRect();
+      dragOffsetX = e.clientX - rect.left;
+      dragOffsetY = e.clientY - rect.top;
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', onDragMove, true);
+    window.addEventListener('mouseup', onDragEnd, true);
+    function onDragMove(e) {
+      if (!dragging) return;
+      let left = e.clientX - dragOffsetX;
+      let top = e.clientY - dragOffsetY;
+      // Keep within viewport
+      const margin = 12;
+      left = Math.max(margin, Math.min(window.innerWidth - form.offsetWidth - margin, left));
+      top = Math.max(margin, Math.min(window.innerHeight - form.offsetHeight - margin, top));
+      form.style.left = left + 'px';
+      form.style.top = top + 'px';
+    }
+    function onDragEnd() {
+      dragging = false;
+      document.body.style.userSelect = '';
+    }
   }
 
   function applyChangedEditsToElement(el, data) {
