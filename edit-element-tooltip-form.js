@@ -26,6 +26,7 @@
       width: computed.width,
       height: computed.height,
       position: computed.position,
+      lineHeight: computed.lineHeight,
     };
   }
 
@@ -60,6 +61,7 @@
     html += row('Class', 'class', details.class);
     if (isLeafNode(targetEl)) {
       html += row('Text', 'text', details.text.replace(/\n/g, ' '));
+      html += row('Line Height', 'lineHeight', details.lineHeight, 'text');
     } else {
       html += row('Text', 'text', '(container - not editable)', 'text', 'readonly');
     }
@@ -133,6 +135,7 @@
     });
     setOrClearStyle('font-size', data.fontSize, computed.fontSize, lastValues.fontSize);
     setOrClearStyle('font-weight', data.fontWeight, computed.fontWeight, lastValues.fontWeight);
+    setOrClearStyle('line-height', data.lineHeight, computed.lineHeight, lastValues.lineHeight);
     setOrClearStyle('width', data.width, computed.width, lastValues.width);
     setOrClearStyle('height', data.height, computed.height, lastValues.height);
     setOrClearStyle('position', data.position, computed.position, lastValues.position);
