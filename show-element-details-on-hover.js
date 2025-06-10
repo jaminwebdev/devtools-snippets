@@ -11,6 +11,7 @@
   let gapRects = [];
   let cleanupScrollResize = null;
   let mutationObserver = null;
+  let copyMessage = null;
 
   function createTooltip() {
     tooltip = document.createElement('div');
@@ -372,6 +373,46 @@
     mutationObserver.observe(document.body, { childList: true, subtree: true });
   }
 
+  function showCopyMessage(x, y) {
+    if (copyMessage) copyMessage.remove();
+    copyMessage = document.createElement('div');
+    copyMessage.textContent = 'Element data added to clipboard';
+    Object.assign(copyMessage.style, {
+      position: 'fixed',
+      left: (x + 16) + 'px',
+      top: (y + 16) + 'px',
+      zIndex: 1000000,
+      background: 'rgba(30,200,80,0.97)',
+      color: '#fff',
+      borderRadius: '6px',
+      padding: '8px 16px',
+      fontFamily: 'monospace',
+      fontSize: '14px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+      pointerEvents: 'none',
+      opacity: 1,
+      transition: 'opacity 0.3s',
+    });
+    document.body.appendChild(copyMessage);
+    setTimeout(() => {
+      if (copyMessage) {
+        copyMessage.style.opacity = 0;
+        setTimeout(() => copyMessage && copyMessage.remove(), 400);
+      }
+    }, 1200);
+  }
+
+  function onRightClick(e) {
+    if (isTooltipOrOutline(e.target)) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el) return;
+    const details = getElementDetails(el).replace(/<br\/?>(\n)?/g, '\n').replace(/<[^>]+>/g, '');
+    navigator.clipboard.writeText(details).then(() => {
+      showCopyMessage(e.clientX, e.clientY);
+    });
+    e.preventDefault();
+  }
+
   function onMove(e) {
     const el = document.elementFromPoint(e.clientX, e.clientY);
     // If hovering a child of a flex/grid container, show child tooltip
@@ -454,6 +495,7 @@
 
   function cleanup() {
     window.removeEventListener('mousemove', onMove, true);
+    window.removeEventListener('contextmenu', onRightClick, true);
     if (tooltip) tooltip.remove();
     if (outline) outline.remove();
     cleanupChildOutlines();
@@ -461,12 +503,14 @@
     if (cleanupScrollResize) cleanupScrollResize();
     if (mutationObserver) mutationObserver.disconnect();
     mutationObserver = null;
+    if (copyMessage) copyMessage.remove();
     window.__elementDetailsCleanup = undefined;
   }
 
   window.__elementDetailsCleanup = cleanup;
   window.addEventListener('mousemove', onMove, true);
   setupScrollResizeCleanup();
+  window.addEventListener('contextmenu', onRightClick, true);
   // Clean up on ESC
   window.addEventListener('keydown', function esc(e) {
     if (e.key === 'Escape') cleanup();
