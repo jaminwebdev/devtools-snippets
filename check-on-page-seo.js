@@ -293,6 +293,8 @@
       position: 'fixed',
       top: '24px',
       right: '24px',
+      left: 'auto',
+      bottom: 'auto',
       background: '#181c24',
       color: '#fff',
       padding: '22px 28px 18px 28px',
@@ -304,11 +306,31 @@
       fontFamily: 'monospace',
       fontSize: '14px',
       boxShadow: '0 2px 16px rgba(0,0,0,0.18)',
-      // Reset flex properties from loading overlay
+      // Reset flex properties from loading overlay and explicitly set initial position
       display: '',
       justifyContent: '',
       alignItems: '',
       flexDirection: '',
+      visibility: 'hidden', // Start hidden to prevent flicker
+      opacity: '0', // Start invisible to prevent flicker
+      transition: 'opacity 0.2s ease-in-out', // Add a fade-in effect
+      top: '24px', // Initial top position
+      right: '24px', // Initial right position
+      left: 'auto', // Ensure left is auto for right positioning
+      bottom: 'auto', // Ensure bottom is auto
+    });
+
+    // Remove any existing overlay first if it's not the one we're reusing
+    if (!existingOverlayElement) {
+      const old = document.getElementById('__seoOverlay');
+      if (old) old.remove();
+      document.body.appendChild(overlay);
+    }
+
+    // Use requestAnimationFrame to ensure visibility is set after layout
+    requestAnimationFrame(() => {
+      overlay.style.visibility = 'visible';
+      overlay.style.opacity = '1';
     });
 
     // Make the overlay draggable
@@ -317,19 +339,21 @@
     let initialOverlayX, initialOverlayY;
 
     overlay.addEventListener('mousedown', (e) => {
-      if (e.target === overlay || overlay.contains(e.target) && !e.target.closest('button, input')) { // Only drag if clicking on the overlay itself or its children that are not buttons/inputs
+      if (e.target === overlay || (overlay.contains(e.target) && !e.target.closest('button, input'))) {
         isDragging = true;
         initialMouseX = e.clientX;
         initialMouseY = e.clientY;
 
-        // Ensure left and top are set for dragging, converting right to left if necessary
-        const currentRight = parseFloat(getComputedStyle(overlay).right);
-        if (!isNaN(currentRight)) {
-          overlay.style.left = (window.innerWidth - overlay.offsetWidth - currentRight) + 'px';
-          overlay.style.right = 'auto';
-        }
-        initialOverlayX = overlay.offsetLeft;
-        initialOverlayY = overlay.offsetTop;
+        // Convert right/top positioning to left/top at the start of drag
+        // This prevents the jump if the element was initially positioned with 'right'.
+        const currentRect = overlay.getBoundingClientRect();
+        overlay.style.left = currentRect.left + 'px';
+        overlay.style.top = currentRect.top + 'px';
+        overlay.style.right = 'auto'; // Remove right property once left is set
+        overlay.style.bottom = 'auto'; // Remove bottom property once top is set
+
+        initialOverlayX = currentRect.left;
+        initialOverlayY = currentRect.top;
 
         overlay.style.cursor = 'grabbing';
         document.addEventListener('mousemove', dragMouseMove);
@@ -389,15 +413,18 @@
     const apply = async function() {
       const val = overlay.querySelector('#__seoKeywordInput').value;
       window.__seoLastKeywords = val;
+
+      // Remove the current overlay before showing loading state and re-auditing
+      overlay.remove();
+
       // Show loading state while re-auditing
-      const currentOverlayRef = overlay; // Keep a reference to the current overlay
       const loading = showLoadingOverlay();
 
       const newAuditResults = await runAudit();
       loading.remove(); // Remove loading overlay
 
-      // Pass the new audit results and the existing (now hidden) overlay element to renderOverlay
-      renderOverlay(newAuditResults, currentOverlayRef);
+      // Render the new audit results. It will create a new overlay in the default position.
+      renderOverlay(newAuditResults);
     };
     overlay.querySelector('#__seoKeywordApply').onclick = apply;
     overlay.querySelector('#__seoKeywordInput').onkeydown = function(e) {
@@ -459,8 +486,14 @@
 
     const loadingOverlayElement = showLoadingOverlay();
     const auditResults = await runAudit();
-    // Pass auditResults and the loadingOverlayElement to renderOverlay
-    renderOverlay(auditResults, loadingOverlayElement);
+    
+    // Remove the loading overlay completely before rendering the main overlay
+    if (loadingOverlayElement) {
+      loadingOverlayElement.remove();
+    }
+
+    // Now render the main overlay. No existing element passed, so it will create a new one.
+    renderOverlay(auditResults);
   })();
 
   // Add global cleanup for the entire script
