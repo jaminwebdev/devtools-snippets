@@ -66,11 +66,20 @@
       <div style="margin-bottom:8px;"><strong>Issues (${issues.length}):</strong></div>
       ${issues.length > 0 ? issues.map(issue => `<div style=\"color:#ff6b6b;margin-bottom:2px;\">• ${issue}</div>`).join('') : '<div style="color:#4CAF50;">No major SEO issues detected</div>'}
       <div style="margin:14px 0 6px 0;"><strong>Stats:</strong></div>
-      <table style="width:100%;font-size:13px;margin-bottom:8px;">
-        ${Object.entries(stats).map(([k,v]) => `<tr><td style=\"color:#aaa;padding-right:8px;\">${k}</td><td style=\"color:#fff;font-weight:bold;text-align:right;\">${v}</td></tr>`).join('')}
+      <table style="width:100%;font-size:13px;margin-bottom:8px; background: #181c24;">
+        ${Object.entries(stats).map(([k,v]) => `<tr style=\"background:#181c24;\"><td style=\"color:#aaa;padding-right:8px;\">${k}</td><td style=\"color:#fff;font-weight:bold;text-align:right;\">${v}</td></tr>`).join('')}
       </table>
       <button onclick="this.parentElement.parentElement.remove()" style="margin-top:6px;background:#333;border:none;color:#fff;padding:6px 16px;border-radius:5px;cursor:pointer;font-size:13px;">Close</button>
     </div>
   `;
   document.body.appendChild(overlay);
+
+  // Close overlay on Escape
+  function seoOverlayEscListener(e) {
+    if (e.key === 'Escape' && overlay.parentElement) {
+      overlay.remove();
+      window.removeEventListener('keydown', seoOverlayEscListener, true);
+    }
+  }
+  window.addEventListener('keydown', seoOverlayEscListener, true);
 })();
