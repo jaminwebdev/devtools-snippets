@@ -1,19 +1,20 @@
 (function() {
 
   const WEIGHTS = {
-    content: 18,
-    title: 12,
-    links: 13,
-    speed: 13,
-    headings: 9,
-    meta: 7,
-    images: 8,
-    url: 6,
+    content: 17,
+    title: 11,
+    links: 12,
+    speed: 12,
+    headings: 8,
+    meta: 6,
+    images: 7,
+    url: 5,
     schema: 8,
-    index: 5,
+    crawlability: 5,
     canonical: 3,
     ux: 6,
-    security: 2
+    security: 2,
+    indexability: 8
   };
 
   // --- Keyword helpers ---
@@ -172,18 +173,42 @@
       score -= Math.min(60, Math.round((noAlt.length / imgs.length) * 100));
       issues.push(`${noAlt.length} images without alt text`);
     }
-    // (Stub: check file sizes, formats)
     return { label: 'Images', score: Math.max(0, score), issues, details: { 'Images': imgs.length, 'Images without Alt': noAlt.length } };
   }
 
-  function checkLinks() {
-    const allLinks = [...document.querySelectorAll('a[href]')];
-    const internal = allLinks.filter(a => a.hostname === location.hostname);
-    const external = allLinks.filter(a => a.hostname !== location.hostname);
+  async function checkLinks() {
+    const allLinks = [...document.querySelectorAll('a[href]')].map(a => a.href).filter(href => href && (href.startsWith('http://') || href.startsWith('https://')));
+    const internal = allLinks.filter(a => {
+      try { return new URL(a).hostname === location.hostname; } catch { return false; }
+    });
+    const external = allLinks.filter(a => {
+      try { return new URL(a).hostname !== location.hostname; } catch { return false; }
+    });
     let score = 100, issues = [];
-    if (internal.length < 3) { score -= 40; issues.push('Very few internal links (<3)'); }
-    // (Stub: check for broken links, anchor diversity, nofollow/dofollow, trust links)
-    return { label: 'Links', score: Math.max(0, score), issues, details: { 'Internal Links': internal.length, 'External Links': external.length } };
+
+    if (internal.length < 3) { score -= 20; issues.push('Very few internal links (<3)'); }
+
+    const brokenLinks = [];
+    // Note: Checking external links with fetch() is often blocked by CORS policies.
+    // This will primarily reliably check internal links or external links with permissive CORS.
+    for (const link of allLinks) {
+      try {
+        const response = await fetch(link, { method: 'HEAD', mode: 'no-cors' }); // Use HEAD request to be faster, no-cors to avoid immediate blocking
+        // For no-cors, status will be 0 and ok will be false if blocked or error
+        // For internal links, response.ok will be true for 2xx statuses.
+        if (!response.ok && response.status !== 0) { 
+          brokenLinks.push(link);
+        }
+      } catch (e) {
+        brokenLinks.push(link); // Network error, likely broken
+      }
+    }
+    if (brokenLinks.length > 0) {
+      score -= Math.min(60, Math.round((brokenLinks.length / allLinks.length) * 100));
+      issues.push(`${brokenLinks.length} broken links found: ${brokenLinks.join(', ')}`);
+    }
+
+    return { label: 'Links', score: Math.max(0, score), issues, details: { 'Total Links': allLinks.length, 'Internal Links': internal.length, 'External Links': external.length, 'Broken Links': brokenLinks.length } };
   }
 
   // --- Stubs for other sections ---
@@ -192,28 +217,47 @@
   const checkURL = () => stubSection('URL Structure');
   const checkSchema = () => stubSection('Structured Data & Schema');
   const checkCanonical = () => stubSection('Canonical Tag');
-  const checkIndex = () => stubSection('Indexability & Crawlability');
+  const checkCrawlability = () => stubSection('Crawlability');
   const checkUX = () => stubSection('UX Signals');
   const checkSecurity = () => stubSection('Security');
 
+  function checkIndexability() {
+    const robotsMeta = document.querySelector('meta[name="robots"]');
+    let score = 100;
+    let issues = [];
+    let details = { 'Robots Meta Tag': 'Not found or indexable' };
+
+    if (robotsMeta) {
+      const content = robotsMeta.content.toLowerCase();
+      if (content.includes('noindex') || content.includes('none')) {
+        score = 0;
+        issues.push('Page is explicitly blocked from indexing by meta robots tag (noindex/none)');
+        details['Robots Meta Tag'] = `Found: ${robotsMeta.content}`;
+      }
+    }
+    return { label: 'Indexability', score, issues, details };
+  }
+
   // --- Run all checks ---
-  function runAudit() {
+  async function runAudit() {
     const keywords = getKeywords();
-    const sections = [
+    const sections = await Promise.all([
       { key: 'content', ...checkContent(keywords) },
       { key: 'title', ...checkTitle(keywords) },
       { key: 'meta', ...checkMeta(keywords) },
       { key: 'headings', ...checkHeadings(keywords) },
       { key: 'images', ...checkImages() },
-      { key: 'links', ...checkLinks() },
+      { key: 'links', ...(await checkLinks()) },
       { key: 'speed', ...checkSpeed() },
       { key: 'url', ...checkURL() },
       { key: 'schema', ...checkSchema() },
+      { key: 'crawlability', ...checkCrawlability() },
       { key: 'canonical', ...checkCanonical() },
-      { key: 'index', ...checkIndex() },
       { key: 'ux', ...checkUX() },
-      { key: 'security', ...checkSecurity() }
-    ];
+      { key: 'security', ...checkSecurity() },
+      { key: 'indexability', ...checkIndexability() }
+    ]);
+
     // --- Calculate weighted score ---
     let totalScore = 0;
     let maxScore = 0;
@@ -221,26 +265,52 @@
       totalScore += (s.score * WEIGHTS[s.key]);
       maxScore += (100 * WEIGHTS[s.key]);
     });
+    const finalScore = Math.round((totalScore / maxScore) * 100);
 
-    return sections;
+    // --- Gather all issues ---
+    const allIssues = sections.flatMap(s => s.issues.map(issue => ({ section: s.label, issue })));
+
+    return { sections, finalScore, allIssues }; // Return all relevant data
   }
 
   // --- Overlay ---
-  function renderOverlay(sections) {
-    // Remove any existing overlay first
-    const old = document.getElementById('__seoOverlay');
-    if (old) old.remove();
-    let totalScore = 0;
-    let maxScore = 0;
-    sections.forEach(s => {
-      totalScore += (s.score * WEIGHTS[s.key]);
-      maxScore += (100 * WEIGHTS[s.key]);
-    });
-    const finalScore = Math.round((totalScore / maxScore) * 100);
-    const allIssues = sections.flatMap(s => s.issues.map(issue => ({ section: s.label, issue })));
-    // Overlay with keyword input
-    const overlay = document.createElement('div');
+  let currentSeoOverlayEscListener = null; // Store the listener for cleanup
+
+  async function renderOverlay(auditResults, existingOverlayElement = null) {
+    // Remove any existing overlay first if it's not the one we're reusing
+    if (!existingOverlayElement) {
+      const old = document.getElementById('__seoOverlay');
+      if (old) old.remove();
+    }
+
+    const { sections, finalScore, allIssues } = auditResults;
+
+    const overlay = existingOverlayElement || document.createElement('div');
     overlay.id = '__seoOverlay';
+
+    // Apply common overlay styles, overwriting any loading styles if reusing
+    Object.assign(overlay.style, {
+      position: 'fixed',
+      top: '24px',
+      right: '24px',
+      background: '#181c24',
+      color: '#fff',
+      padding: '22px 28px 18px 28px',
+      borderRadius: '10px',
+      zIndex: 999999,
+      maxWidth: '480px',
+      maxHeight: '90vh',
+      overflowY: 'auto',
+      fontFamily: 'monospace',
+      fontSize: '14px',
+      boxShadow: '0 2px 16px rgba(0,0,0,0.18)',
+      // Reset flex properties from loading overlay
+      display: '',
+      justifyContent: '',
+      alignItems: '',
+      flexDirection: '',
+    });
+
     overlay.innerHTML = `
       <style>
         #__seoKeywordInput::selection {
@@ -248,7 +318,7 @@
           color: #181c24; /* Dark text for contrast */
         }
       </style>
-      <div style="position:fixed;top:24px;right:24px;background:#181c24;color:#fff;padding:22px 28px 18px 28px;border-radius:10px;z-index:999999;max-width:480px;max-height:90vh;overflow-y:auto;font-family:monospace;font-size:14px;box-shadow:0 2px 16px rgba(0,0,0,0.18);">
+      <div style="width:100%; height:100%;">
         <h3 style="margin:0 0 12px 0;color:#4CAF50;font-size:18px;">SEO Audit</h3>
         <div style="margin-bottom:10px;">
           <label for="__seoKeywordInput"><b>Keywords (comma separated):</b></label>
@@ -267,13 +337,23 @@
         <button onclick="this.parentElement.parentElement.remove()" style="margin-top:6px;background:#333;border:none;color:#fff;padding:6px 16px;border-radius:5px;cursor:pointer;font-size:13px;">Close</button>
       </div>
     `;
-    document.body.appendChild(overlay);
+    if (!existingOverlayElement) {
+      document.body.appendChild(overlay);
+    }
+
     // Keyword apply logic
-    const apply = function() {
+    const apply = async function() {
       const val = overlay.querySelector('#__seoKeywordInput').value;
       window.__seoLastKeywords = val;
-      overlay.remove();
-      renderOverlay(runAudit());
+      // Show loading state while re-auditing
+      const currentOverlayRef = overlay; // Keep a reference to the current overlay
+      const loading = showLoadingOverlay();
+
+      const newAuditResults = await runAudit();
+      loading.remove(); // Remove loading overlay
+
+      // Pass the new audit results and the existing (now hidden) overlay element to renderOverlay
+      renderOverlay(newAuditResults, currentOverlayRef);
     };
     overlay.querySelector('#__seoKeywordApply').onclick = apply;
     overlay.querySelector('#__seoKeywordInput').onkeydown = function(e) {
@@ -282,16 +362,73 @@
         apply();
       }
     };
-    // Close overlay on Escape
-    function seoOverlayEscListener(e) {
+
+    // Close overlay on Escape (manage the listener for this specific overlay)
+    if (currentSeoOverlayEscListener) {
+      window.removeEventListener('keydown', currentSeoOverlayEscListener, true);
+    }
+    const newEscListener = function(e) {
       if (e.key === 'Escape' && overlay.parentElement) {
         overlay.remove();
-        window.removeEventListener('keydown', seoOverlayEscListener, true);
+        window.removeEventListener('keydown', newEscListener, true);
+        currentSeoOverlayEscListener = null; // Clear global reference
       }
-    }
-    window.addEventListener('keydown', seoOverlayEscListener, true);
+    };
+    window.addEventListener('keydown', newEscListener, true);
+    currentSeoOverlayEscListener = newEscListener; // Store global reference
+  }
+
+  // --- Initial Load Logic ---
+  function showLoadingOverlay() {
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.id = '__seoLoadingOverlay';
+    Object.assign(loadingOverlay.style, {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: '100%',
+      height: '100%',
+      background: 'rgba(0,0,0,0.7)',
+      zIndex: 1000000,
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      flexDirection: 'column',
+      fontFamily: 'monospace',
+      color: '#fff',
+    });
+    loadingOverlay.innerHTML = `
+      <div style="font-size:24px;margin-bottom:15px;">Performing SEO Analysis...</div>
+      <div style="border: 4px solid #f3f3f3; border-top: 4px solid #00e0ff; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite;"></div>
+      <style>
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      </style>
+    `;
+    document.body.appendChild(loadingOverlay);
+    return loadingOverlay;
   }
 
   // --- Run and render ---
-  renderOverlay(runAudit());
+  (async () => {
+    // Ensure any previous instances are cleaned up, including their event listeners
+    if (window.__seoCleanup) window.__seoCleanup(); 
+
+    const loadingOverlayElement = showLoadingOverlay();
+    const auditResults = await runAudit();
+    // Pass auditResults and the loadingOverlayElement to renderOverlay
+    renderOverlay(auditResults, loadingOverlayElement);
+  })();
+
+  // Add global cleanup for the entire script
+  window.__seoCleanup = () => {
+    const existingOverlay = document.getElementById('__seoOverlay');
+    if (existingOverlay) existingOverlay.remove();
+    const existingLoading = document.getElementById('__seoLoadingOverlay');
+    if (existingLoading) existingLoading.remove();
+    // Ensure the escape listener is also removed if active
+    if (currentSeoOverlayEscListener) {
+      window.removeEventListener('keydown', currentSeoOverlayEscListener, true);
+      currentSeoOverlayEscListener = null;
+    }
+  };
 })();
