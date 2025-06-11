@@ -211,7 +211,6 @@
     return { label: 'Links', score: Math.max(0, score), issues, details: { 'Total Links': allLinks.length, 'Internal Links': internal.length, 'External Links': external.length, 'Broken Links': brokenLinks.length } };
   }
 
-  // --- Stubs for other sections ---
   function stubSection(label) { return { label, score: 100, issues: [], details: {} }; }
   const checkSpeed = () => stubSection('Page Speed');
   const checkURL = () => stubSection('URL Structure');
