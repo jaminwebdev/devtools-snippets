@@ -46,29 +46,31 @@
   }
   
   // Basic stats
-  console.table({
+  const stats = {
     'Title Length': title ? title.textContent.length : 0,
     'Meta Description Length': metaDesc ? metaDesc.content.length : 0,
     'H1 Count': h1s.length,
     'Images': document.images.length,
     'Images with Alt': document.images.length - imagesNoAlt.length,
+    'Images without Alt': imagesNoAlt.length,
     'Internal Links': internalLinks.length,
     'External Links': [...document.querySelectorAll('a[href]')].filter(a => a.hostname !== location.hostname).length
-  });
-})();
+  };
+  console.table(stats);
 
-// expand on this greatly
-// add visual overlay
   // Visual overlay
-  // const overlay = document.createElement('div');
-  // overlay.innerHTML = `
-  //   <div style="position:fixed;top:20px;right:20px;background:#000;color:#fff;padding:20px;border-radius:8px;z-index:999999;max-width:400px;font-family:monospace;font-size:12px;">
-  //     <h3 style="margin:0 0 10px 0;color:#4CAF50;">SEO Audit</h3>
-  //     <div><strong>Issues (${issues.length}):</strong></div>
-  //     ${issues.map(issue => `<div style="color:#ff6b6b;">• ${issue}</div>`).join('')}
-  //     <div style="margin-top:10px;"><strong>Warnings (${warnings.length}):</strong></div>
-  //     ${warnings.map(warning => `<div style="color:#ffd93d;">• ${warning}</div>`).join('')}
-  //     <button onclick="this.parentElement.parentElement.remove()" style="margin-top:10px;background:#666;border:none;color:#fff;padding:5px 10px;border-radius:4px;cursor:pointer;">Close</button>
-  //   </div>
-  // `;
-  // document.body.appendChild(overlay);
+  const overlay = document.createElement('div');
+  overlay.innerHTML = `
+    <div style="position:fixed;top:24px;right:24px;background:#181c24;color:#fff;padding:22px 28px 18px 28px;border-radius:10px;z-index:999999;max-width:420px;font-family:monospace;font-size:14px;box-shadow:0 2px 16px rgba(0,0,0,0.18);">
+      <h3 style="margin:0 0 12px 0;color:#4CAF50;font-size:18px;">SEO Audit</h3>
+      <div style="margin-bottom:8px;"><strong>Issues (${issues.length}):</strong></div>
+      ${issues.length > 0 ? issues.map(issue => `<div style=\"color:#ff6b6b;margin-bottom:2px;\">• ${issue}</div>`).join('') : '<div style="color:#4CAF50;">No major SEO issues detected</div>'}
+      <div style="margin:14px 0 6px 0;"><strong>Stats:</strong></div>
+      <table style="width:100%;font-size:13px;margin-bottom:8px;">
+        ${Object.entries(stats).map(([k,v]) => `<tr><td style=\"color:#aaa;padding-right:8px;\">${k}</td><td style=\"color:#fff;font-weight:bold;text-align:right;\">${v}</td></tr>`).join('')}
+      </table>
+      <button onclick="this.parentElement.parentElement.remove()" style="margin-top:6px;background:#333;border:none;color:#fff;padding:6px 16px;border-radius:5px;cursor:pointer;font-size:13px;">Close</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+})();
