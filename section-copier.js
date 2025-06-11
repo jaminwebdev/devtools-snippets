@@ -8,8 +8,10 @@
   const BORDER_STYLE = '3px solid #00e0ff';
   const ICON_SVG = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00e0ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>`;
   const PLUS_ICON_SVG = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00e0ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+  const BOTTOM_PLUS_ICON_SVG = PLUS_ICON_SVG;
   const TARGET_SELECTOR = 'section,div,article';
   const STYLE_ID = '__highlightSectionsStyle';
+  const TRASH_ICON_SVG = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff3b3b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>`;
 
   let icons = [];
   let copiedMsg = null;
@@ -72,21 +74,24 @@
     document.head.appendChild(style);
   }
 
+  function activateSection(section) {
+    section.classList.add(HIGHLIGHT_CLASS);
+    // Remove any existing icon
+    section.querySelectorAll('.' + ICON_CLASS).forEach(icon => icon.remove());
+    section.addEventListener('mouseenter', onSectionEnter);
+    section.addEventListener('mouseleave', onSectionLeave);
+  }
+
   function highlightSections() {
     addHighlightStyles();
     document.querySelectorAll(TARGET_SELECTOR).forEach(section => {
-      section.classList.add(HIGHLIGHT_CLASS);
-      // Remove any existing icon
-      section.querySelectorAll('.' + ICON_CLASS).forEach(icon => icon.remove());
-      // Add icon only on hover
-      section.addEventListener('mouseenter', onSectionEnter);
-      section.addEventListener('mouseleave', onSectionLeave);
+      activateSection(section);
     });
   }
 
   function onSectionEnter(e) {
     const section = e.currentTarget;
-    // Add copy/plus icon wrapper if not present
+    // Add copy/plus/trash icon wrapper at top if not present
     if (!section.querySelector('.__sectionIconWrap')) {
       const icon = document.createElement('button');
       icon.innerHTML = ICON_SVG;
@@ -97,16 +102,29 @@
         ev.preventDefault();
         copySectionHTML(section, icon);
       });
-      // Add plus icon
+      // Add plus icon (insert before)
       const plusIcon = document.createElement('button');
       plusIcon.innerHTML = PLUS_ICON_SVG;
       plusIcon.className = ICON_CLASS + ' __sectionPlusIcon';
-      plusIcon.title = 'Paste saved HTML';
+      plusIcon.title = 'Paste saved HTML before';
       plusIcon.style.marginLeft = '8px';
       plusIcon.addEventListener('click', function(ev) {
         ev.stopPropagation();
         ev.preventDefault();
-        showPastePopup(plusIcon);
+        showPastePopup(plusIcon, 'before');
+      });
+      // Add trashcan icon
+      const trashIcon = document.createElement('button');
+      trashIcon.innerHTML = TRASH_ICON_SVG;
+      trashIcon.className = ICON_CLASS + ' __sectionTrashIcon';
+      trashIcon.title = 'Delete section from DOM';
+      trashIcon.style.marginLeft = '8px';
+      trashIcon.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        ev.preventDefault();
+        const parent = section.parentElement;
+        section.remove();
+        showDeleteMsg(icon);
       });
       const iconWrap = document.createElement('div');
       iconWrap.className = '__sectionIconWrap';
@@ -120,16 +138,45 @@
       iconWrap.style.zIndex = 10001;
       iconWrap.appendChild(icon);
       iconWrap.appendChild(plusIcon);
+      iconWrap.appendChild(trashIcon);
       section.appendChild(iconWrap);
       icons.push(iconWrap);
+    }
+    // Add bottom plus icon for insert after
+    if (!section.querySelector('.__sectionIconWrapBottom')) {
+      const bottomPlus = document.createElement('button');
+      bottomPlus.innerHTML = BOTTOM_PLUS_ICON_SVG;
+      bottomPlus.className = ICON_CLASS + ' __sectionPlusIconBottom';
+      bottomPlus.title = 'Paste saved HTML after';
+      bottomPlus.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        ev.preventDefault();
+        showPastePopup(bottomPlus, 'after');
+      });
+      const bottomWrap = document.createElement('div');
+      bottomWrap.className = '__sectionIconWrapBottom';
+      bottomWrap.style.display = 'flex';
+      bottomWrap.style.alignItems = 'center';
+      bottomWrap.style.justifyContent = 'center';
+      bottomWrap.style.position = 'absolute';
+      bottomWrap.style.left = '50%';
+      bottomWrap.style.bottom = '-28px';
+      bottomWrap.style.transform = 'translateX(-50%)';
+      bottomWrap.style.zIndex = 10001;
+      bottomWrap.appendChild(bottomPlus);
+      section.appendChild(bottomWrap);
+      icons.push(bottomWrap);
     }
   }
 
   function onSectionLeave(e) {
     const section = e.currentTarget;
-    // Remove the icon wrapper directly
+    // Remove the icon wrappers directly
     const iconWrap = section.querySelector('.__sectionIconWrap');
     if (iconWrap) iconWrap.remove();
+    const bottomWrap = section.querySelector('.__sectionIconWrapBottom');
+    if (bottomWrap) bottomWrap.remove();
+    // Do NOT remove the popup here
   }
 
   function copySectionHTML(section, icon) {
@@ -181,19 +228,23 @@
     savePopup.style.background = '#fff';
     savePopup.style.color = '#222';
     savePopup.style.border = '2px solid #00e0ff';
-    savePopup.style.borderRadius = '8px';
-    savePopup.style.boxShadow = '0 2px 12px rgba(0,0,0,0.18)';
-    savePopup.style.padding = '14px 18px 10px 18px';
+    savePopup.style.borderRadius = '12px';
+    savePopup.style.boxShadow = '0 2px 16px rgba(0,0,0,0.18)';
+    savePopup.style.padding = '28px 38px 24px 38px';
     savePopup.style.zIndex = 10010;
     savePopup.style.fontFamily = 'monospace';
     savePopup.style.fontSize = '15px';
+    savePopup.style.minWidth = '440px';
+    savePopup.style.maxWidth = '600px';
     savePopup.innerHTML = `
-      <div style='margin-bottom:8px;'>Save section HTML</div>
-      <input type='text' id='__sectionSaveName' placeholder='Enter a name...' style='width:98%;margin-bottom:8px;padding:4px 6px;border-radius:4px;border:1px solid #00e0ff;font-size:15px;'/><br/>
-      <button id='__sectionSaveBtn' style='margin-right:8px;padding:3px 12px;border-radius:4px;border:none;background:#00e0ff;color:#222;font-weight:bold;cursor:pointer;'>Save to LocalStorage</button>
-      <button id='__sectionCopyBtn' style='padding:3px 12px;border-radius:4px;border:none;background:#00e0ff;color:#222;font-weight:bold;cursor:pointer;'>Copy to Clipboard</button>
-      <button id='__sectionCancelBtn' style='margin-left:8px;padding:3px 12px;border-radius:4px;border:none;background:#eee;color:#222;cursor:pointer;'>Cancel</button>
-      <div id='__sectionSaveMsg' style='margin-top:8px;font-size:13px;color:#00b300;display:none;'></div>
+      <div style='margin-bottom:14px;'>Save section HTML</div>
+      <input type='text' id='__sectionSaveName' placeholder='Enter a name...' style='width:98%;margin-bottom:18px;padding:7px 10px;border-radius:6px;border:1.5px solid #00e0ff;font-size:16px;'/><br/>
+      <div style='display:flex;gap:25px;justify-content:center;margin-bottom:0;'>
+        <button id='__sectionSaveBtn' style='padding:7px 22px;border-radius:6px;border:none;background:#00e0ff;color:#222;font-weight:bold;cursor:pointer;font-size:15px;'>Save to LocalStorage</button>
+        <button id='__sectionCopyBtn' style='padding:7px 22px;border-radius:6px;border:none;background:#00e0ff;color:#222;font-weight:bold;cursor:pointer;font-size:15px;'>Copy to Clipboard</button>
+        <button id='__sectionCancelBtn' style='padding:7px 22px;border-radius:6px;border:none;background:#eee;color:#222;cursor:pointer;font-size:15px;'>Cancel</button>
+      </div>
+      <div id='__sectionSaveMsg' style='margin-top:14px;font-size:14px;color:#00b300;display:none;'></div>
     `;
     icon.parentElement.appendChild(savePopup);
     const nameInput = savePopup.querySelector('#__sectionSaveName');
@@ -236,39 +287,52 @@
     window.addEventListener('keydown', onPopupEsc, true);
   }
 
-  function showPastePopup(plusIcon) {
+  function showPastePopup(plusIcon, position) {
     if (savePopup) savePopup.remove();
     savePopup = document.createElement('div');
     savePopup.style.position = 'absolute';
     savePopup.style.left = '50%';
-    savePopup.style.top = '-80px';
+    savePopup.style.top = position === 'after' ? 'auto' : '-80px';
+    savePopup.style.bottom = position === 'after' ? '-80px' : 'auto';
     savePopup.style.transform = 'translateX(-50%)';
     savePopup.style.background = '#fff';
     savePopup.style.color = '#222';
     savePopup.style.border = '2px solid #00e0ff';
-    savePopup.style.borderRadius = '8px';
-    savePopup.style.boxShadow = '0 2px 12px rgba(0,0,0,0.18)';
-    savePopup.style.padding = '14px 18px 10px 18px';
+    savePopup.style.borderRadius = '12px';
+    savePopup.style.boxShadow = '0 2px 16px rgba(0,0,0,0.18)';
+    savePopup.style.padding = '28px 38px 24px 38px';
     savePopup.style.zIndex = 10010;
     savePopup.style.fontFamily = 'monospace';
     savePopup.style.fontSize = '15px';
+    savePopup.style.minWidth = '440px';
+    savePopup.style.maxWidth = '600px';
     // Get all saved keys
     const keys = Object.keys(localStorage).filter(k => k.startsWith('__savedSectionHTML_'));
-    let html = `<div style='margin-bottom:8px;'>Paste saved HTML</div>`;
+    let html = `<div style='margin-bottom:14px;'>Paste saved HTML</div>`;
     if (keys.length === 0) {
-      html += `<div style='color:#b00;margin-bottom:8px;'>No saved items found.</div>`;
+      html += `<div style='color:#b00;margin-bottom:14px;'>No saved items found.</div>`;
     } else {
-      html += `<select id='__sectionPasteSelect' style='width:98%;margin-bottom:8px;padding:4px 6px;border-radius:4px;border:1px solid #00e0ff;font-size:15px;'>`;
+      html += `<select id='__sectionPasteSelect' style='width:99%;margin-bottom:18px;padding:7px 10px;border-radius:6px;border:1.5px solid #00e0ff;font-size:16px;'>`;
       keys.forEach(k => {
         const name = k.replace('__savedSectionHTML_', '');
         html += `<option value='${k}'>${name}</option>`;
       });
       html += `</select><br/>`;
-      html += `<button id='__sectionPasteCopyBtn' style='margin-right:8px;padding:3px 12px;border-radius:4px;border:none;background:#00e0ff;color:#222;font-weight:bold;cursor:pointer;'>Copy to Clipboard</button>`;
-      html += `<button id='__sectionPasteInsertBtn' style='margin-right:8px;padding:3px 12px;border-radius:4px;border:none;background:#00e0ff;color:#222;font-weight:bold;cursor:pointer;'>Insert Before</button>`;
+      // Button row
+      html += `<div style='display:flex;gap:25px;justify-content:center;margin-bottom:0;'>`;
+      const isPlus = plusIcon.classList.contains('__sectionPlusIcon') || plusIcon.classList.contains('__sectionPlusIconBottom');
+      if (!isPlus) {
+        html += `<button id='__sectionPasteCopyBtn' style='padding:7px 22px;border-radius:6px;border:none;background:#00e0ff;color:#222;font-weight:bold;cursor:pointer;font-size:15px;'>Copy to Clipboard</button>`;
+        html += `<button id='__sectionPasteInsertBtn' style='padding:7px 22px;border-radius:6px;border:none;background:#00e0ff;color:#222;font-weight:bold;cursor:pointer;font-size:15px;'>Insert ${position === 'after' ? 'After' : 'Before'}</button>`;
+        html += `</div>`;
+        html += `<div style='display:flex;justify-content:center;margin-top:18px;'><button id='__sectionPasteCancelBtn' style='padding:7px 22px;border-radius:6px;border:none;background:#eee;color:#222;cursor:pointer;font-size:15px;'>Cancel</button></div>`;
+      } else {
+        html += `<button id='__sectionPasteInsertBtn' style='padding:7px 22px;border-radius:6px;border:none;background:#00e0ff;color:#222;font-weight:bold;cursor:pointer;font-size:15px;'>Insert ${position === 'after' ? 'After' : 'Before'}</button>`;
+        html += `<button id='__sectionPasteCancelBtn' style='padding:7px 22px;border-radius:6px;border:none;background:#eee;color:#222;cursor:pointer;font-size:15px;'>Cancel</button>`;
+        html += `</div>`;
+      }
     }
-    html += `<button id='__sectionPasteCancelBtn' style='padding:3px 12px;border-radius:4px;border:none;background:#eee;color:#222;cursor:pointer;'>Cancel</button>`;
-    html += `<div id='__sectionPasteMsg' style='margin-top:8px;font-size:13px;color:#00b300;display:none;'></div>`;
+    html += `<div id='__sectionPasteMsg' style='margin-top:14px;font-size:14px;color:#00b300;display:none;'></div>`;
     savePopup.innerHTML = html;
     plusIcon.parentElement.appendChild(savePopup);
     const select = savePopup.querySelector('#__sectionPasteSelect');
@@ -306,9 +370,16 @@
             temp.innerHTML = html;
             // Insert all top-level nodes (should be one, but just in case)
             Array.from(temp.childNodes).forEach(node => {
-              section.parentElement.insertBefore(node, section);
+              if (position === 'after') {
+                section.parentElement.insertBefore(node, section.nextSibling);
+              } else {
+                section.parentElement.insertBefore(node, section);
+              }
+              if (node.nodeType === 1 && (node.matches(TARGET_SELECTOR))) {
+                activateSection(node);
+              }
             });
-            msg.textContent = 'Inserted before section!';
+            msg.textContent = `Inserted ${position === 'after' ? 'after' : 'before'} section!`;
             msg.style.display = 'block';
             setTimeout(() => { if (savePopup) savePopup.remove(); savePopup = null; }, 1200);
           }
@@ -361,6 +432,37 @@
     }, 1200);
   }
 
+  function showDeleteMsg(icon) {
+    if (copiedMsg) copiedMsg.remove();
+    copiedMsg = document.createElement('div');
+    copiedMsg.className = COPIED_CLASS;
+    copiedMsg.textContent = 'Deleted!';
+    Object.assign(copiedMsg.style, {
+      position: 'absolute',
+      top: '-28px',
+      right: '0',
+      background: '#ff3b3b',
+      color: '#fff',
+      fontWeight: 'bold',
+      fontFamily: 'monospace',
+      fontSize: '14px',
+      borderRadius: '5px',
+      padding: '3px 12px',
+      zIndex: 10002,
+      pointerEvents: 'none',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+      opacity: 1,
+      transition: 'opacity 0.3s',
+    });
+    icon.parentElement.appendChild(copiedMsg);
+    setTimeout(() => {
+      if (copiedMsg) {
+        copiedMsg.style.opacity = 0;
+        setTimeout(() => copiedMsg && copiedMsg.remove(), 400);
+      }
+    }, 1200);
+  }
+
   function cleanup() {
     document.querySelectorAll(TARGET_SELECTOR).forEach(section => {
       section.classList.remove(HIGHLIGHT_CLASS);
@@ -384,6 +486,18 @@
     if (e.key === 'Escape') cleanup();
   }
 
+  // Prevent popup from being closed when clicking inside it
+  if (!window.__sectionCopierPopupClickGuard) {
+    document.addEventListener('mousedown', function(e) {
+      if (savePopup && savePopup.contains(e.target)) {
+        // Click inside popup, do nothing
+        return;
+      }
+      // Click outside popup, do nothing (let Cancel/Escape handle closing)
+    }, true);
+    window.__sectionCopierPopupClickGuard = true;
+  }
+
   window.__highlightSectionsCleanup = cleanup;
   highlightSections();
   window.addEventListener('keydown', onEsc, true);
@@ -393,6 +507,3 @@
 
 // todos
 // style better
-// make it so new sections can also have items inserted before them
-// add plus to bottom for insert after
-// add trashcan icon to delete section (from DOM only)
