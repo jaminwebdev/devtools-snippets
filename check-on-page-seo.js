@@ -311,6 +311,50 @@
       flexDirection: '',
     });
 
+    // Make the overlay draggable
+    let isDragging = false;
+    let initialMouseX, initialMouseY;
+    let initialOverlayX, initialOverlayY;
+
+    overlay.addEventListener('mousedown', (e) => {
+      if (e.target === overlay || overlay.contains(e.target) && !e.target.closest('button, input')) { // Only drag if clicking on the overlay itself or its children that are not buttons/inputs
+        isDragging = true;
+        initialMouseX = e.clientX;
+        initialMouseY = e.clientY;
+
+        // Ensure left and top are set for dragging, converting right to left if necessary
+        const currentRight = parseFloat(getComputedStyle(overlay).right);
+        if (!isNaN(currentRight)) {
+          overlay.style.left = (window.innerWidth - overlay.offsetWidth - currentRight) + 'px';
+          overlay.style.right = 'auto';
+        }
+        initialOverlayX = overlay.offsetLeft;
+        initialOverlayY = overlay.offsetTop;
+
+        overlay.style.cursor = 'grabbing';
+        document.addEventListener('mousemove', dragMouseMove);
+        document.addEventListener('mouseup', dragMouseUp);
+      }
+    });
+
+    const dragMouseMove = (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - initialMouseX;
+      const dy = e.clientY - initialMouseY;
+      overlay.style.left = (initialOverlayX + dx) + 'px';
+      overlay.style.top = (initialOverlayY + dy) + 'px';
+    };
+
+    const dragMouseUp = () => {
+      isDragging = false;
+      overlay.style.cursor = 'grab';
+      document.removeEventListener('mousemove', dragMouseMove);
+      document.removeEventListener('mouseup', dragMouseUp);
+    };
+
+    // Set initial cursor style
+    overlay.style.cursor = 'grab';
+
     overlay.innerHTML = `
       <style>
         #__seoKeywordInput::selection {
