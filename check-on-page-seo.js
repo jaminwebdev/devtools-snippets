@@ -384,9 +384,27 @@
           background: #00e0ff; /* Light blue background for selection */
           color: #181c24; /* Dark text for contrast */
         }
+        /* Scrollbar styles */
+        #__seoOverlay::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        #__seoOverlay::-webkit-scrollbar-track {
+          background:rgb(63, 63, 63);
+          border-radius: 10px;
+        }
+
+        #__seoOverlay::-webkit-scrollbar-thumb {
+          background: #1a1a1a;
+          border-radius: 10px;
+        }
+
+        #__seoOverlay::-webkit-scrollbar-thumb:hover {
+          background: #333;
+        }
       </style>
       <div style="width:100%; height:100%;">
-        <h3 style="margin:0 0 12px 0;color:#4CAF50;font-size:18px;">SEO Audit</h3>
+        <h3 style="margin:0 0 12px 0;color:#4CAF50;font-size:24px;text-align: center;">SEO Audit</h3>
         <div style="margin-bottom:10px;">
           <label for="__seoKeywordInput"><b>Keywords (comma separated):</b></label>
           <input id="__seoKeywordInput" type="text" style="width:100%;margin-top:4px;margin-bottom:0;padding:6px 10px;border-radius:6px;border:1.5px solid #00e0ff;font-size:15px;background:#222;color:#fff;" placeholder="e.g. seo, audit, ranking" value="${window.__seoLastKeywords || ''}" />
@@ -401,7 +419,10 @@
         <table style="width:100%;font-size:13px;margin-bottom:8px;background:#181c24;">
           ${sections.map(s => `<tr style=\"background:#181c24;\"><td style=\"color:#aaa;padding-right:8px;\">${s.label}</td><td style=\"color:#fff;font-weight:bold;text-align:right;\">${s.score}</td></tr>`).join('')}
         </table>
-        <button onclick="this.parentElement.parentElement.remove()" style="margin-top:6px;background:#333;border:none;color:#fff;padding:6px 16px;border-radius:5px;cursor:pointer;font-size:13px;">Close</button>
+        <div style="display:flex; justify-content:space-between; width:100%;">
+          <button id="__seoCopyResults" style="background:#00e0ff;border:none;color:#222;padding:6px 16px;border-radius:5px;cursor:pointer;font-size:13px; flex-grow:1; margin-right: 8px;">Copy Results</button>
+          <button id="__seoCloseOverlay" style="background:#333;border:none;color:#fff;padding:6px 16px;border-radius:5px;cursor:pointer;font-size:13px;">Close</button>
+        </div>
       </div>
     `;
     if (!existingOverlayElement) {
@@ -431,6 +452,52 @@
         e.preventDefault();
         apply();
       }
+    };
+
+    // Copy to clipboard logic
+    const copyButton = overlay.querySelector('#__seoCopyResults');
+    const originalCopyButtonText = copyButton.textContent;
+    const originalCopyButtonBg = copyButton.style.background;
+
+    copyButton.onclick = async function() {
+      let textToCopy = "SEO Audit Results:\n\n";
+      textToCopy += `Total SEO Score: ${finalScore}/100\n\n`;
+
+      if (allIssues.length > 0) {
+        textToCopy += "Issues & Warnings:\n";
+        allIssues.forEach(i => {
+          textToCopy += `- ${i.section}: ${i.issue}\n`;
+        });
+        textToCopy += "\n";
+      } else {
+        textToCopy += "No major SEO issues detected.\n\n";
+      }
+
+      textToCopy += "Section Scores:\n";
+      sections.forEach(s => {
+        textToCopy += `- ${s.label}: ${s.score}/100\n`;
+      });
+
+      try {
+        await navigator.clipboard.writeText(textToCopy);
+        copyButton.textContent = 'Copied!';
+        setTimeout(() => {
+          copyButton.textContent = originalCopyButtonText;
+        }, 3000);
+      } catch (err) {
+        console.error('Failed to copy text: ', err);
+        copyButton.textContent = 'Failed!';
+        copyButton.style.background = '#ff6b6b'; // Red background for error
+        setTimeout(() => {
+          copyButton.textContent = originalCopyButtonText;
+          copyButton.style.background = originalCopyButtonBg; // Revert background color
+        }, 3000);
+      }
+    };
+
+    // Close button logic
+    overlay.querySelector('#__seoCloseOverlay').onclick = function() {
+      overlay.remove();
     };
 
     // Close overlay on Escape (manage the listener for this specific overlay)
