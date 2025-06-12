@@ -17,7 +17,6 @@
     indexability: 8
   };
 
-  // --- Keyword helpers ---
   function getKeywords() {
     const input = document.getElementById('__seoKeywordInput');
     let val = '';
@@ -200,7 +199,7 @@
           brokenLinks.push(link);
         }
       } catch (e) {
-        brokenLinks.push(link); // Network error, likely broken
+        brokenLinks.push(link);
       }
     }
     if (brokenLinks.length > 0) {
@@ -237,7 +236,6 @@
     return { label: 'Indexability', score, issues, details };
   }
 
-  // --- Run all checks ---
   async function runAudit() {
     const keywords = getKeywords();
     const sections = await Promise.all([
@@ -257,7 +255,6 @@
       { key: 'indexability', ...checkIndexability() }
     ]);
 
-    // --- Calculate weighted score ---
     let totalScore = 0;
     let maxScore = 0;
     sections.forEach(s => {
@@ -266,17 +263,15 @@
     });
     const finalScore = Math.round((totalScore / maxScore) * 100);
 
-    // --- Gather all issues ---
     const allIssues = sections.flatMap(s => s.issues.map(issue => ({ section: s.label, issue })));
 
-    return { sections, finalScore, allIssues }; // Return all relevant data
+    return { sections, finalScore, allIssues };
   }
 
   // --- Overlay ---
   let currentSeoOverlayEscListener = null; // Store the listener for cleanup
 
   async function renderOverlay(auditResults, existingOverlayElement = null) {
-    // Remove any existing overlay first if it's not the one we're reusing
     if (!existingOverlayElement) {
       const old = document.getElementById('__seoOverlay');
       if (old) old.remove();
@@ -319,7 +314,6 @@
       bottom: 'auto', // Ensure bottom is auto
     });
 
-    // Remove any existing overlay first if it's not the one we're reusing
     if (!existingOverlayElement) {
       const old = document.getElementById('__seoOverlay');
       if (old) old.remove();
@@ -332,7 +326,7 @@
       overlay.style.opacity = '1';
     });
 
-    // Make the overlay draggable
+
     let isDragging = false;
     let initialMouseX, initialMouseY;
     let initialOverlayX, initialOverlayY;
@@ -375,7 +369,6 @@
       document.removeEventListener('mouseup', dragMouseUp);
     };
 
-    // Set initial cursor style
     overlay.style.cursor = 'grab';
 
     overlay.innerHTML = `
@@ -429,21 +422,17 @@
       document.body.appendChild(overlay);
     }
 
-    // Keyword apply logic
     const apply = async function() {
       const val = overlay.querySelector('#__seoKeywordInput').value;
       window.__seoLastKeywords = val;
 
-      // Remove the current overlay before showing loading state and re-auditing
       overlay.remove();
 
-      // Show loading state while re-auditing
       const loading = showLoadingOverlay();
 
       const newAuditResults = await runAudit();
       loading.remove(); // Remove loading overlay
 
-      // Render the new audit results. It will create a new overlay in the default position.
       renderOverlay(newAuditResults);
     };
     overlay.querySelector('#__seoKeywordApply').onclick = apply;
@@ -487,20 +476,18 @@
       } catch (err) {
         console.error('Failed to copy text: ', err);
         copyButton.textContent = 'Failed!';
-        copyButton.style.background = '#ff6b6b'; // Red background for error
+        copyButton.style.background = '#ff6b6b'; 
         setTimeout(() => {
           copyButton.textContent = originalCopyButtonText;
-          copyButton.style.background = originalCopyButtonBg; // Revert background color
+          copyButton.style.background = originalCopyButtonBg;
         }, 3000);
       }
     };
 
-    // Close button logic
     overlay.querySelector('#__seoCloseOverlay').onclick = function() {
       overlay.remove();
     };
 
-    // Close overlay on Escape (manage the listener for this specific overlay)
     if (currentSeoOverlayEscListener) {
       window.removeEventListener('keydown', currentSeoOverlayEscListener, true);
     }
