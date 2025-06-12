@@ -384,9 +384,27 @@
           background: #00e0ff; /* Light blue background for selection */
           color: #181c24; /* Dark text for contrast */
         }
+        /* Scrollbar styles */
+        #__seoOverlay::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        #__seoOverlay::-webkit-scrollbar-track {
+          background:rgb(63, 63, 63);
+          border-radius: 10px;
+        }
+
+        #__seoOverlay::-webkit-scrollbar-thumb {
+          background: #1a1a1a;
+          border-radius: 10px;
+        }
+
+        #__seoOverlay::-webkit-scrollbar-thumb:hover {
+          background: #333;
+        }
       </style>
       <div style="width:100%; height:100%;">
-        <h3 style="margin:0 0 12px 0;color:#4CAF50;font-size:18px;">SEO Audit</h3>
+        <h3 style="margin:0 0 12px 0;color:#4CAF50;font-size:24px;text-align: center;">SEO Audit</h3>
         <div style="margin-bottom:10px;">
           <label for="__seoKeywordInput"><b>Keywords (comma separated):</b></label>
           <input id="__seoKeywordInput" type="text" style="width:100%;margin-top:4px;margin-bottom:0;padding:6px 10px;border-radius:6px;border:1.5px solid #00e0ff;font-size:15px;background:#222;color:#fff;" placeholder="e.g. seo, audit, ranking" value="${window.__seoLastKeywords || ''}" />
